@@ -25,7 +25,8 @@ export default function UniversityLayer({ map, universities }) {
   const tooltipRef      = useRef(null);
 
   const { metric, selectedUniversity, setSelectedUniversity,
-          comparedUniversities, toggleCompareUniversity } = useApp();
+          comparedUniversities, toggleCompareUniversity,
+          highlightedUnis } = useApp();
 
   // Keep stable refs for use inside Leaflet callbacks
   const metricRef      = useRef(metric);
@@ -48,11 +49,11 @@ export default function UniversityLayer({ map, universities }) {
     const tip = L.DomUtil.create('div', '', document.body);
     Object.assign(tip.style, {
       position: 'fixed', pointerEvents: 'none', display: 'none',
-      background: 'rgba(10,14,26,0.93)', color: '#e8eaf0',
+      background: 'rgba(254,252,249,0.96)', color: '#1E1B4B',
       padding: '8px 12px', borderRadius: '6px', fontSize: '13px',
       maxWidth: '260px', lineHeight: '1.6', zIndex: '9999',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
-      border: '1px solid rgba(255,255,255,0.08)',
+      boxShadow: '0 4px 14px rgba(99,102,241,0.12)',
+      border: '1px solid rgba(99,102,241,0.12)',
     });
     tooltipRef.current = tip;
 
@@ -110,9 +111,9 @@ export default function UniversityLayer({ map, universities }) {
 
       const marker = L.circleMarker([uni.lat, uni.lon], {
         radius,
-        fillColor: '#3b82f6',
+        fillColor: '#6366F1',
         fillOpacity: 0.8,
-        color: 'rgba(255,255,255,0.6)',
+        color: 'rgba(255,255,255,0.7)',
         weight: 1.5,
       });
 
@@ -205,7 +206,7 @@ export default function UniversityLayer({ map, universities }) {
     if (!field) {
       colorScaleRef.current = null;
       cg.eachLayer(m => {
-        if (m.setStyle) m.setStyle({ fillColor: '#3b82f6' });
+        if (m.setStyle) m.setStyle({ fillColor: '#6366F1' });
       });
       cg.refreshClusters();
       return;
@@ -222,7 +223,7 @@ export default function UniversityLayer({ map, universities }) {
       if (!marker._uni || !marker.setStyle) return;
       const val = marker._uni[field];
       marker.setStyle({
-        fillColor: val != null ? colorScale(val) : '#444',
+        fillColor: val != null ? colorScale(val) : '#E4E0EF',
       });
     });
 
@@ -243,15 +244,46 @@ export default function UniversityLayer({ map, universities }) {
       const isCompared = comparedIds.has(marker._uni.unitid);
 
       if (isSelected) {
-        marker.setStyle({ color: '#ff6b35', weight: 2.5, fillOpacity: 1 });
+        marker.setStyle({ color: '#EC4899', weight: 2.5, fillOpacity: 1 });
       } else if (isCompared) {
-        marker.setStyle({ color: '#22d3ee', weight: 3, fillOpacity: 1 });
+        marker.setStyle({ color: '#6366F1', weight: 3, fillOpacity: 1 });
       } else {
-        marker.setStyle({ color: 'rgba(255,255,255,0.6)', weight: 1.5, fillOpacity: 0.8 });
+        marker.setStyle({ color: 'rgba(255,255,255,0.7)', weight: 1.5, fillOpacity: 0.8 });
       }
       if ((isSelected || isCompared) && marker.bringToFront) marker.bringToFront();
     });
   }, [selectedUniversity, comparedUniversities, universities]);
+
+  // ── Highlight/dim markers based on chart brushing ───────────────────────
+  useEffect(() => {
+    const cg = clusterGroupRef.current;
+    if (!cg) return;
+
+    const comparedIds = new Set(comparedUniversities.map(u => u.unitid));
+
+    if (!highlightedUnis) {
+      cg.eachLayer(marker => {
+        if (!marker._uni || !marker.setStyle) return;
+        const isSelected = selectedUniversity?.unitid === marker._uni.unitid;
+        const isCompared = comparedIds.has(marker._uni.unitid);
+        marker.setStyle({
+          fillOpacity: isSelected || isCompared ? 1 : 0.8,
+          opacity: 1,
+        });
+      });
+      return;
+    }
+
+    cg.eachLayer(marker => {
+      if (!marker._uni || !marker.setStyle) return;
+      const inside = highlightedUnis.has(marker._uni.unitid);
+      marker.setStyle({
+        fillOpacity: inside ? 1 : 0.1,
+        opacity: inside ? 1 : 0.2,
+      });
+      if (inside && marker.bringToFront) marker.bringToFront();
+    });
+  }, [highlightedUnis, selectedUniversity, comparedUniversities]);
 
   return null; // Renders via Leaflet, not React DOM
 }

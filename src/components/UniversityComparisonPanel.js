@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import RadarChart from './RadarChart';
 
 const COMPARE_METRICS = [
   { key: 'tuition_in',        label: 'In-State Tuition',   format: v => `$${v.toLocaleString()}` },
@@ -11,11 +12,10 @@ const COMPARE_METRICS = [
   { key: 'sat_avg',           label: 'SAT Average',         format: v => Math.round(v).toLocaleString() },
   { key: 'student_faculty_ratio', label: 'Student:Faculty', format: v => `${v}:1` },
   { key: 'avg_inst_grant',    label: 'Avg Grant',           format: v => `$${v.toLocaleString()}` },
-  { key: 'cs_rank',           label: 'CS Rank (US)',        format: v => `#${Math.round(v)}` },
   { key: 'overall_rank',      label: 'Overall Rank (US)',   format: v => `#${Math.round(v)}` },
 ];
 
-const LOWER_IS_BETTER = new Set(['tuition_in', 'tuition_out', 'student_faculty_ratio', 'cs_rank', 'overall_rank']);
+const LOWER_IS_BETTER = new Set(['tuition_in', 'tuition_out', 'student_faculty_ratio', 'overall_rank']);
 
 function bestIndex(values, key) {
   const nums  = values.map(v => (v == null ? null : parseFloat(v)));
@@ -42,6 +42,12 @@ export default function UniversityComparisonPanel() {
           )}
         </div>
       </div>
+
+      {comparedUniversities.length >= 2 && (
+        <div className="cp-radar-area">
+          <RadarChart universities={comparedUniversities} />
+        </div>
+      )}
 
       <div className="cp-table">
         {/* Column headers */}

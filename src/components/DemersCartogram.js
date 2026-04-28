@@ -227,11 +227,11 @@ export default function DemersCartogram({ map, universities, zoomingOut }) {
     const tip = document.createElement('div');
     Object.assign(tip.style, {
       position: 'fixed', pointerEvents: 'none', display: 'none',
-      background: 'rgba(10,14,26,0.93)', color: '#e8eaf0',
+      background: 'rgba(254,252,249,0.96)', color: '#1E1B4B',
       padding: '8px 12px', borderRadius: '6px', fontSize: '13px',
       maxWidth: '260px', lineHeight: '1.6', zIndex: '9999',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
-      border: '1px solid rgba(255,255,255,0.08)',
+      boxShadow: '0 4px 14px rgba(99,102,241,0.12)',
+      border: '1px solid rgba(99,102,241,0.12)',
     });
     document.body.appendChild(tip);
     tooltipRef.current = tip;
@@ -245,9 +245,9 @@ export default function DemersCartogram({ map, universities, zoomingOut }) {
       .attr('width',  d => d.side)
       .attr('height', d => d.side)
       .attr('rx', 2)
-      .style('fill', '#3b82f6')
+      .style('fill', '#6366F1')
       .style('fill-opacity', 0.85)
-      .style('stroke', 'rgba(255,255,255,0.5)')
+      .style('stroke', 'rgba(30,27,75,0.3)')
       .style('stroke-width', 1)
       .on('mouseenter', function (event, d) {
         const cfg   = METRICS[metricRef.current];
@@ -307,7 +307,7 @@ export default function DemersCartogram({ map, universities, zoomingOut }) {
 
     rects.style('fill', d => {
       const val = d.uni[field];
-      return val != null ? colorScale(val) : '#444';
+      return val != null ? colorScale(val) : '#E4E0EF';
     });
   }, [metric, universities]);
 
@@ -316,7 +316,7 @@ export default function DemersCartogram({ map, universities, zoomingOut }) {
     if (!svgRef.current) return;
     d3.select(svgRef.current).selectAll('rect')
       .style('stroke', d =>
-        selectedUniversity?.unitid === d.uni.unitid ? '#ff6b35' : 'rgba(255,255,255,0.5)')
+        selectedUniversity?.unitid === d.uni.unitid ? '#EC4899' : 'rgba(30,27,75,0.3)')
       .style('stroke-width', d =>
         selectedUniversity?.unitid === d.uni.unitid ? 2.5 : 1)
       .style('fill-opacity', d =>

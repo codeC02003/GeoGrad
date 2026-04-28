@@ -11,7 +11,7 @@ export default function StateMap({ zoomingOut, onZoomOutComplete }) {
   const mapRef       = useRef(null);
   const [mapReady, setMapReady] = useState(false);
 
-  const { zoomedState, selectedUniversity } = useApp();
+  const { zoomedState, selectedUniversity, backToNational } = useApp();
 
   // Find the GeoJSON feature for this state
   const stateFeature = useMemo(
@@ -44,7 +44,7 @@ export default function StateMap({ zoomingOut, onZoomOutComplete }) {
       maxBoundsViscosity: 0.8,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19,
@@ -53,9 +53,9 @@ export default function StateMap({ zoomingOut, onZoomOutComplete }) {
     // State boundary overlay
     const boundaryLayer = L.geoJSON(stateFeature, {
       style: {
-        fillColor: 'rgba(59,130,246,0.08)',
+        fillColor: 'rgba(99,102,241,0.06)',
         fillOpacity: 1,
-        color: 'rgba(59,130,246,0.45)',
+        color: 'rgba(99,102,241,0.35)',
         weight: 2,
       },
     }).addTo(map);
@@ -120,6 +120,12 @@ export default function StateMap({ zoomingOut, onZoomOutComplete }) {
       {mapReady && mapRef.current && (
         <UniversityLayer map={mapRef.current} universities={universities} />
       )}
+      <button className="back-to-national-btn" onClick={backToNational}>
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+          <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Back to National
+      </button>
     </div>
   );
 }

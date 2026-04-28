@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -8,13 +8,16 @@ import UniversityComparisonPanel from '../components/UniversityComparisonPanel';
 import StateMap from '../components/StateMap';
 import UniversityDetailPanel from '../components/UniversityDetailPanel';
 import SearchBar from '../components/SearchBar';
+import ScatterPlot from '../components/ScatterPlot';
+import ParallelCoordinates from '../components/ParallelCoordinates';
 import stateData from '../data/state_data.json';
 import universityData from '../data/university_data.json';
 
-function Controls() {
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+function Sidebar() {
   const { metric, setMetric, selectedStates, toggleState,
           zoomedState, comparedUniversities, toggleCompareUniversity,
-          clearComparedUniversities } = useApp();
+          clearComparedUniversities, chartView } = useApp();
   const navigate = useNavigate();
 
   const uniCount = useMemo(
@@ -22,156 +25,260 @@ function Controls() {
     [zoomedState],
   );
 
-  // Auto-switch metric when view changes
   const level = zoomedState ? 'state' : 'national';
   useEffect(() => {
     const cfg = METRICS[metric];
     if (cfg && cfg.level !== level) {
-      // Pick first metric of the correct level
       const fallback = Object.entries(METRICS).find(([, c]) => c.level === level);
       if (fallback) setMetric(fallback[0]);
     }
   }, [level, metric, setMetric]);
 
   const filteredMetrics = Object.entries(METRICS).filter(([, cfg]) => cfg.level === level);
+  const stateInfo = zoomedState ? stateData[zoomedState] : null;
 
-  // ── State drill-down view controls ──────────────────────────────────────
-  if (zoomedState) {
-    const info = stateData[zoomedState];
-    return (
-      <div className="controls">
-        <div className="controls-title">{info?.state_name || zoomedState}</div>
-        <div className="state-uni-count">{uniCount} universities</div>
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        {zoomedState ? (
+          <>
+            <div className="sidebar-state-name">{stateInfo?.state_name || zoomedState}</div>
+            <div className="sidebar-subtitle">{uniCount} universities</div>
+          </>
+        ) : (
+          <>
+            <div className="sidebar-brand">GeoGrad</div>
+            <div className="sidebar-subtitle">U.S. Master's Program Explorer</div>
+          </>
+        )}
+      </div>
 
-        <SearchBar />
+      <div className="sidebar-body">
+        <div className="sidebar-section">
+          <SearchBar />
+        </div>
 
-        <label className="control-label">Metric</label>
-        <select
-          className="control-select"
-          value={metric}
-          onChange={e => setMetric(e.target.value)}
-        >
-          {filteredMetrics.map(([key, cfg]) => (
-            <option key={key} value={key}>{cfg.label}</option>
-          ))}
-        </select>
-
-        {comparedUniversities.length > 0 && (
-          <div className="selected-states">
-            <label className="control-label">Comparing</label>
-            <div className="state-chips">
-              {comparedUniversities.map(uni => (
-                <span key={uni.unitid} className="chip chip-uni" onClick={() => toggleCompareUniversity(uni)}>
-                  {uni.name.length > 20 ? uni.name.slice(0, 18) + '...' : uni.name} &times;
-                </span>
+        {!chartView && (
+          <div className="sidebar-section">
+            <div className="sidebar-label">Color by</div>
+            <select
+              className="sidebar-select"
+              value={metric}
+              onChange={e => setMetric(e.target.value)}
+            >
+              {filteredMetrics.map(([key, cfg]) => (
+                <option key={key} value={key}>{cfg.label}</option>
               ))}
-              {comparedUniversities.length > 1 && (
-                <span className="chip chip-clear" onClick={clearComparedUniversities}>
-                  Clear All
-                </span>
-              )}
+            </select>
+          </div>
+        )}
+
+        {!zoomedState && selectedStates.length > 0 && (
+          <div className="sidebar-section">
+            <div className="sidebar-label">
+              Selected States
+              <span className="sidebar-badge">{selectedStates.length}</span>
+            </div>
+            <div className="sidebar-chips">
+              {selectedStates.map(abbr => (
+                <button key={abbr} className="sidebar-chip" onClick={() => toggleState(abbr)}>
+                  {abbr}
+                  <svg viewBox="0 0 10 10" width="10" height="10"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        <div className="hint">
-          <em>Click</em> a marker to view details<br />
-          <em>Ctrl+Click</em> or use <em>+</em> in search to compare<br />
-          <em>Scroll</em> to zoom into clusters
-        </div>
-
-        <button className="back-home-btn" onClick={() => navigate('/')}>
-          &#8592; Back to Home
-        </button>
-      </div>
-    );
-  }
-
-  // ── National view controls ──────────────────────────────────────────────
-  return (
-    <div className="controls">
-      <div className="controls-title">GeoGrad</div>
-      <div className="controls-subtitle">U.S. Master's Program Explorer</div>
-
-      <SearchBar />
-
-      <label className="control-label">Metric</label>
-      <select
-        className="control-select"
-        value={metric}
-        onChange={e => setMetric(e.target.value)}
-      >
-        {filteredMetrics.map(([key, cfg]) => (
-          <option key={key} value={key}>{cfg.label}</option>
-        ))}
-      </select>
-
-      {selectedStates.length > 0 && (
-        <div className="selected-states">
-          <label className="control-label">Selected States</label>
-          <div className="state-chips">
-            {selectedStates.map(abbr => (
-              <span key={abbr} className="chip" onClick={() => toggleState(abbr)}>
-                {abbr} ✕
-              </span>
-            ))}
+        {comparedUniversities.length > 0 && (
+          <div className="sidebar-section">
+            <div className="sidebar-label">
+              Comparing
+              <span className="sidebar-badge">{comparedUniversities.length}</span>
+              {comparedUniversities.length > 1 && (
+                <button className="sidebar-clear" onClick={clearComparedUniversities}>Clear all</button>
+              )}
+            </div>
+            <div className="sidebar-chips">
+              {comparedUniversities.map(uni => (
+                <button key={uni.unitid} className="sidebar-chip sidebar-chip--cyan" onClick={() => toggleCompareUniversity(uni)}>
+                  {uni.name.length > 22 ? uni.name.slice(0, 20) + '\u2026' : uni.name}
+                  <svg viewBox="0 0 10 10" width="10" height="10"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {comparedUniversities.length > 0 && (
-        <div className="selected-states">
-          <label className="control-label">Comparing Universities</label>
-          <div className="state-chips">
-            {comparedUniversities.map(uni => (
-              <span key={uni.unitid} className="chip chip-uni" onClick={() => toggleCompareUniversity(uni)}>
-                {uni.name.length > 20 ? uni.name.slice(0, 18) + '...' : uni.name} &times;
-              </span>
-            ))}
-            {comparedUniversities.length > 1 && (
-              <span className="chip chip-clear" onClick={clearComparedUniversities}>
-                Clear All
-              </span>
+      <div className="sidebar-footer">
+        <div className="sidebar-tips">
+          <div className="sidebar-tips-title">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M8 7v4M8 5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Quick Tips
+          </div>
+          <div className="sidebar-tips-list">
+            {zoomedState ? (
+              <>
+                <span><b>Click</b> a marker to view details</span>
+                <span><b>Ctrl+Click</b> or search <b>+</b> to compare</span>
+                <span><b>Scroll</b> to zoom into clusters</span>
+              </>
+            ) : (
+              <>
+                <span><b>Click</b> a state to select &amp; compare</span>
+                <span><b>Double-click</b> to explore universities</span>
+                <span>Use <b>search</b> to find any university</span>
+              </>
             )}
           </div>
         </div>
-      )}
 
-      <div className="hint">
-        <em>Click</em> a state to select/compare<br />
-        <em>Double-click</em> to drill into universities
+        <button className="sidebar-home-btn" onClick={() => navigate('/')}>
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+            <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Back to Home
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/* ── View Toolbar (breadcrumb + tabs) ─────────────────────────────────────── */
+function ViewToolbar() {
+  const { chartView, setChartView, zoomedState, backToNational } = useApp();
+  const stateInfo = zoomedState ? stateData[zoomedState] : null;
+
+  const views = [
+    { id: null, label: 'Map', icon: (
+      <svg viewBox="0 0 18 18" width="15" height="15" fill="none">
+        <path d="M2 5.5l4.5-3 5 3.5 4.5-3v10l-4.5 3-5-3.5-4.5 3V5.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+      </svg>
+    )},
+    { id: 'scatter', label: 'Scatter', icon: (
+      <svg viewBox="0 0 18 18" width="15" height="15" fill="none">
+        <circle cx="5" cy="13" r="1.3" fill="currentColor"/><circle cx="8" cy="7" r="1.3" fill="currentColor"/>
+        <circle cx="13" cy="10" r="1.3" fill="currentColor"/><circle cx="11" cy="4" r="1.3" fill="currentColor"/>
+        <circle cx="15" cy="6" r="1.3" fill="currentColor"/>
+      </svg>
+    )},
+    { id: 'parallel', label: 'Parallel', icon: (
+      <svg viewBox="0 0 18 18" width="15" height="15" fill="none">
+        <path d="M3 3v12M7 3v12M11 3v12M15 3v12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+        <path d="M3 7l4 4 4-2 4 3" stroke="currentColor" strokeWidth="1" opacity="0.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    )},
+  ];
+
+  return (
+    <div className="view-toolbar">
+      <div className="toolbar-nav">
+        <button
+          className={`toolbar-crumb${!zoomedState ? ' toolbar-crumb--current' : ''}`}
+          onClick={() => zoomedState && backToNational()}
+          disabled={!zoomedState}
+        >
+          National
+        </button>
+        {zoomedState && (
+          <>
+            <svg className="toolbar-crumb-sep" viewBox="0 0 8 14" width="8" height="14">
+              <path d="M2 1l4 6-4 6" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="toolbar-crumb toolbar-crumb--current">
+              {stateInfo?.state_name || zoomedState}
+            </span>
+          </>
+        )}
       </div>
 
-      <button className="back-home-btn" onClick={() => navigate('/')}>
-        &#8592; Back to Home
-      </button>
+      <div className="view-tabs">
+        {views.map(v => (
+          <button
+            key={v.label}
+            className={`view-tab${chartView === v.id ? ' view-tab--active' : ''}`}
+            onClick={() => setChartView(v.id)}
+          >
+            {v.icon}
+            {v.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-function Legend() {
-  const { metric } = useApp();
+/* ── Floating Legend (draggable) ───────────────────────────────────────────── */
+function FloatingLegend() {
+  const { metric, chartView } = useApp();
+  const legendRef = useRef(null);
+  const dragState = useRef(null);
+
+  const onPointerDown = useCallback((e) => {
+    const el = legendRef.current;
+    if (!el) return;
+    el.setPointerCapture(e.pointerId);
+    dragState.current = { startX: e.clientX, startY: e.clientY, origLeft: el.offsetLeft, origTop: el.offsetTop };
+    el.style.cursor = 'grabbing';
+  }, []);
+
+  const onPointerMove = useCallback((e) => {
+    const ds = dragState.current;
+    const el = legendRef.current;
+    if (!ds || !el) return;
+    const dx = e.clientX - ds.startX;
+    const dy = e.clientY - ds.startY;
+    el.style.left = `${ds.origLeft + dx}px`;
+    el.style.top = `${ds.origTop + dy}px`;
+    el.style.bottom = 'auto';
+    el.style.right = 'auto';
+  }, []);
+
+  const onPointerUp = useCallback((e) => {
+    const el = legendRef.current;
+    if (!el) return;
+    el.releasePointerCapture(e.pointerId);
+    dragState.current = null;
+    el.style.cursor = 'grab';
+  }, []);
+
+  if (chartView) return null;
   const cfg = METRICS[metric];
   if (!cfg) return null;
 
-  const stops    = d3.range(0, 1.01, 0.1).map(t => cfg.interpolator(t)).reverse();
+  const stops = d3.range(0, 1.01, 0.1).map(t => cfg.interpolator(t)).reverse();
   const gradient = `linear-gradient(to bottom, ${stops.join(', ')})`;
 
   return (
-    <div className="legend">
-      <div className="legend-title">{cfg.label}</div>
-      <div className="legend-gradient" style={{ background: gradient }} />
-      <div className="legend-labels">
-        <span>High</span>
-        <span>Low</span>
+    <div
+      className="floating-legend"
+      ref={legendRef}
+      style={{ cursor: 'grab' }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
+      <div className="fl-title">{cfg.label}</div>
+      <div className="fl-row">
+        <div className="fl-bar" style={{ background: gradient }} />
+        <div className="fl-labels">
+          <span>High</span>
+          <span>Low</span>
+        </div>
       </div>
-      <div className="legend-na">
-        <span className="na-box" /> No data
+      <div className="fl-na">
+        <span className="fl-na-swatch" />
+        No data
       </div>
     </div>
   );
 }
 
+/* ── Onboarding ───────────────────────────────────────────────────────────── */
 function Onboarding() {
   const [dismissed, setDismissed] = useState(() => {
     try { return sessionStorage.getItem('geograd-onboarded') === '1'; } catch { return false; }
@@ -186,40 +293,49 @@ function Onboarding() {
   };
 
   return (
-    <div className="onboarding-overlay">
-      <div className="onboarding-tip">
-        <span className="onboarding-tip-icon">Click</span>
-        <span className="onboarding-tip-text"><strong>Click</strong> a state to compare</span>
+    <div className="onboarding">
+      <div className="onboarding-inner">
+        <div className="onboarding-pill">
+          <kbd>Click</kbd>
+          <span>Select &amp; compare states</span>
+        </div>
+        <div className="onboarding-sep" />
+        <div className="onboarding-pill">
+          <kbd>2&times; Click</kbd>
+          <span>Explore universities</span>
+        </div>
+        <div className="onboarding-sep" />
+        <div className="onboarding-pill">
+          <kbd>Search</kbd>
+          <span>Find any university</span>
+        </div>
       </div>
-      <div className="onboarding-tip">
-        <span className="onboarding-tip-icon">2x</span>
-        <span className="onboarding-tip-text"><strong>Double-click</strong> to explore universities</span>
-      </div>
-      <div className="onboarding-tip">
-        <span className="onboarding-tip-icon">Search</span>
-        <span className="onboarding-tip-text">Use the <strong>search bar</strong> to find any university</span>
-      </div>
-      <button className="onboarding-dismiss" onClick={dismiss} title="Dismiss">&#10005;</button>
+      <button className="onboarding-dismiss" onClick={dismiss} aria-label="Dismiss">
+        <svg viewBox="0 0 10 10" width="10" height="10">
+          <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+        </svg>
+      </button>
     </div>
   );
 }
 
-function MapArea() {
+/* ── Content Area ─────────────────────────────────────────────────────────── */
+function ContentArea() {
   const { selectedStates, zoomedState, selectedUniversity, backToNational,
-          comparedUniversities } = useApp();
+          comparedUniversities, chartView } = useApp();
   const [zoomingOut, setZoomingOut] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [showState, setShowState] = useState(false);
+  const [uniPanelDragH, setUniPanelDragH] = useState(null);
+  const [statePanelDragH, setStatePanelDragH] = useState(null);
+  const panelDragRef = useRef(null);
+  const statePanelDragRef = useRef(null);
+  const contentRef = useRef(null);
 
-  // Smooth crossfade: when zoomedState changes, fade out then fade in
   useEffect(() => {
     if (zoomedState) {
-      // Zoom-in: brief fade then show state map
       setTransitioning(true);
-      const t = setTimeout(() => {
-        setShowState(true);
-        setTransitioning(false);
-      }, 350);
+      const t = setTimeout(() => { setShowState(true); setTransitioning(false); }, 350);
       return () => clearTimeout(t);
     } else {
       setShowState(false);
@@ -231,99 +347,169 @@ function MapArea() {
   const showDetail        = !!zoomedState && !!selectedUniversity && !zoomingOut;
   const showUniComparison = comparedUniversities.length > 0;
 
-  // Panel height: university comparison takes priority when active
-  let panelHeight = '0';
-  if (showUniComparison) panelHeight = '260px';
-  else if (showComparison) panelHeight = '220px';
-  else if (showDetail) panelHeight = '280px';
-
-  const handleBackToNational = useCallback(() => {
-    setZoomingOut(true);
-  }, []);
+  const hasRadar = showUniComparison && comparedUniversities.length >= 2;
 
   const handleZoomOutComplete = useCallback(() => {
     setZoomingOut(false);
     backToNational();
   }, [backToNational]);
 
-  return (
-    <div className="map-area">
-      {/* National map — stays mounted during zoom-in fade */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        bottom: panelHeight,
-        transition: 'bottom 0.3s, opacity 0.35s ease-in-out',
-        opacity: (zoomedState && showState) ? 0 : 1,
-        pointerEvents: showState ? 'none' : 'auto',
-        zIndex: 1,
-      }}>
-        <NationalMap />
-      </div>
+  const isChart = chartView === 'scatter' || chartView === 'parallel';
 
-      {/* State map — fades in on top */}
-      {zoomedState && (
+  const defaultUniH = hasRadar ? 420 : 260;
+  const uniPanelH = showUniComparison
+    ? `${uniPanelDragH != null ? uniPanelDragH : defaultUniH}px`
+    : '0';
+
+  useEffect(() => {
+    if (!showUniComparison) setUniPanelDragH(null);
+  }, [showUniComparison]);
+
+  useEffect(() => {
+    if (!showComparison) setStatePanelDragH(null);
+  }, [showComparison]);
+
+  const onPanelDragStart = useCallback((e) => {
+    const container = contentRef.current;
+    if (!container) return;
+    e.target.setPointerCapture(e.pointerId);
+    const containerRect = container.getBoundingClientRect();
+    panelDragRef.current = { containerBottom: containerRect.bottom, containerTop: containerRect.top };
+  }, []);
+
+  const onPanelDragMove = useCallback((e) => {
+    const ds = panelDragRef.current;
+    if (!ds) return;
+    const newH = ds.containerBottom - e.clientY;
+    const maxH = (ds.containerBottom - ds.containerTop) * 0.85;
+    setUniPanelDragH(Math.max(120, Math.min(newH, maxH)));
+  }, []);
+
+  const onPanelDragEnd = useCallback((e) => {
+    e.target.releasePointerCapture(e.pointerId);
+    panelDragRef.current = null;
+  }, []);
+
+  const onStatePanelDragStart = useCallback((e) => {
+    const container = contentRef.current;
+    if (!container) return;
+    e.target.setPointerCapture(e.pointerId);
+    const rect = container.getBoundingClientRect();
+    statePanelDragRef.current = { containerBottom: rect.bottom, containerTop: rect.top };
+  }, []);
+
+  const onStatePanelDragMove = useCallback((e) => {
+    const ds = statePanelDragRef.current;
+    if (!ds) return;
+    const newH = ds.containerBottom - e.clientY;
+    const maxH = (ds.containerBottom - ds.containerTop) * 0.85;
+    setStatePanelDragH(Math.max(120, Math.min(newH, maxH)));
+  }, []);
+
+  const onStatePanelDragEnd = useCallback((e) => {
+    e.target.releasePointerCapture(e.pointerId);
+    statePanelDragRef.current = null;
+  }, []);
+  const statePanelH = `${statePanelDragH != null ? statePanelDragH : 220}px`;
+  const mapOnlyPanelH = showUniComparison ? uniPanelH
+    : showComparison ? statePanelH
+    : showDetail ? '280px' : '0';
+
+  return (
+    <div className="content-area" ref={contentRef}>
+      {/* ── Map view ────────────────────────────────────────── */}
+      <div className={`view-layer${isChart ? ' view-hidden' : ''}`}>
         <div style={{
           position: 'absolute', inset: 0,
-          bottom: panelHeight,
-          transition: 'bottom 0.3s, opacity 0.4s ease-in-out',
-          opacity: showState && !transitioning ? 1 : 0,
-          zIndex: 2,
+          bottom: mapOnlyPanelH,
+          transition: 'bottom 0.3s ease, opacity 0.35s ease-in-out',
+          opacity: (zoomedState && showState) ? 0 : 1,
+          pointerEvents: showState ? 'none' : 'auto',
+          zIndex: 1,
         }}>
-          <StateMap zoomingOut={zoomingOut} onZoomOutComplete={handleZoomOutComplete} />
+          <NationalMap />
         </div>
-      )}
 
-      {/* Onboarding tips for first-time users */}
-      <Onboarding />
+        {zoomedState && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            bottom: mapOnlyPanelH,
+            transition: 'bottom 0.3s ease, opacity 0.4s ease-in-out',
+            opacity: showState && !transitioning ? 1 : 0,
+            zIndex: 2,
+          }}>
+            <StateMap zoomingOut={zoomingOut} onZoomOutComplete={handleZoomOutComplete} />
+          </div>
+        )}
 
-      {/* Floating back button on state view */}
-      {zoomedState && showState && !zoomingOut && (
-        <button className="back-national-float" style={{ zIndex: 3 }} onClick={handleBackToNational}>
-          &#8592; Back to National View
-        </button>
-      )}
+        <Onboarding />
+        <FloatingLegend />
 
-      {/* National view: comparison panel */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: showComparison ? '220px' : 0,
-        transition: 'height 0.3s', overflow: 'hidden',
-        zIndex: 3,
-      }}>
-        <ComparisonPanel />
+        <div className="bottom-panel-wrapper" style={{
+          height: (!showUniComparison && showComparison)
+            ? `${statePanelDragH != null ? statePanelDragH : 220}px`
+            : 0,
+          zIndex: 3,
+          transition: statePanelDragRef.current ? 'none' : undefined,
+        }}>
+          <div
+            className="panel-drag-handle"
+            onPointerDown={onStatePanelDragStart}
+            onPointerMove={onStatePanelDragMove}
+            onPointerUp={onStatePanelDragEnd}
+          />
+          <ComparisonPanel />
+        </div>
+
+        {!showUniComparison && (
+          <div className="bottom-panel-wrapper" style={{
+            height: showDetail ? '280px' : 0,
+            zIndex: 3,
+          }}>
+            {zoomedState && <UniversityDetailPanel />}
+          </div>
+        )}
       </div>
 
-      {/* State view: university detail panel (hidden when comparison is open) */}
-      {!showUniComparison && (
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          height: showDetail ? '280px' : 0,
-          transition: 'height 0.3s', overflow: 'hidden',
-          zIndex: 3,
-        }}>
-          {zoomedState && <UniversityDetailPanel />}
+      {/* ── Chart views (conditional render) ────────────────── */}
+      {chartView === 'scatter' && (
+        <div className="view-layer view-chart" style={{ bottom: uniPanelH, transition: 'bottom 0.3s ease' }}>
+          <ScatterPlot />
+        </div>
+      )}
+      {chartView === 'parallel' && (
+        <div className="view-layer view-chart" style={{ bottom: uniPanelH, transition: 'bottom 0.3s ease' }}>
+          <ParallelCoordinates />
         </div>
       )}
 
-      {/* University comparison panel (visible in both views) */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: showUniComparison ? '260px' : 0,
-        transition: 'height 0.3s', overflow: 'hidden',
-        zIndex: 4,
+      {/* ── University Comparison Panel (visible in ALL views) ─── */}
+      <div className="bottom-panel-wrapper" style={{
+        height: uniPanelH,
+        zIndex: 20,
+        transition: panelDragRef.current ? 'none' : undefined,
       }}>
+        <div
+          className="panel-drag-handle"
+          onPointerDown={onPanelDragStart}
+          onPointerMove={onPanelDragMove}
+          onPointerUp={onPanelDragEnd}
+        />
         <UniversityComparisonPanel />
       </div>
     </div>
   );
 }
 
+/* ── Page Shell ───────────────────────────────────────────────────────────── */
 export default function MapPage() {
   return (
-    <div className="map-page-shell">
-      <Controls />
-      <MapArea />
-      <Legend />
+    <div className="explorer">
+      <Sidebar />
+      <main className="explorer-main">
+        <ViewToolbar />
+        <ContentArea />
+      </main>
     </div>
   );
 }

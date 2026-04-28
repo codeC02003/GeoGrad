@@ -13,7 +13,6 @@ const COMPARE_METRICS = [
   { key: 'cost_total',        label: 'Cost of Living',       format: v => `$${v.toLocaleString()}` },
   { key: 'safety_incidents',  label: 'Hate Crimes',          format: v => v.toLocaleString() },
   { key: 'avg_temp_high_f',   label: 'Avg High Temp',        format: v => `${v.toFixed(1)}°F` },
-  { key: 'best_cs_rank',      label: 'Best CS Rank',         format: v => `#${Math.round(v)}` },
 ];
 
 const LOWER_IS_BETTER = new Set(['tuition_out','tuition_in','safety_incidents','cost_total']);

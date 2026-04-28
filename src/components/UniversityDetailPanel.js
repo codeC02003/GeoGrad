@@ -66,8 +66,6 @@ export default function UniversityDetailPanel() {
 
         <div className="uni-detail-section">
           <div className="uni-section-title">Rankings</div>
-          <div className="uni-stat-row"><span>CS (US)</span><span>{rank(uni.cs_rank)}</span></div>
-          <div className="uni-stat-row"><span>CS (Global)</span><span>{rank(uni.cs_global_rank)}</span></div>
           <div className="uni-stat-row"><span>Overall (US)</span><span>{rank(uni.overall_rank)}</span></div>
           <div className="uni-stat-row"><span>Overall (Global)</span><span>{rank(uni.overall_global_rank)}</span></div>
           <div className="uni-stat-row"><span>Research (US)</span><span>{rank(uni.research_rank)}</span></div>

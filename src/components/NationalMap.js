@@ -33,9 +33,9 @@ function getFeatureStyle(abbr, metricKey, colorScale, selectedStates) {
   const val      = stateData[abbr]?.[metricKey];
   const selected = selectedStates.includes(abbr);
   return {
-    fillColor:   val != null ? colorScale(val) : '#444',
+    fillColor:   val != null ? colorScale(val) : '#E4E0EF',
     fillOpacity: 0.7,
-    color:       selected ? '#ff6b35' : 'rgba(255,255,255,0.3)',
+    color:       selected ? '#6366F1' : 'rgba(30,27,75,0.3)',
     weight:      selected ? 2.5 : 0.6,
   };
 }
@@ -69,7 +69,7 @@ export default function NationalMap() {
       doubleClickZoom: false,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19,
@@ -78,11 +78,11 @@ export default function NationalMap() {
     const tip = L.DomUtil.create('div', '', document.body);
     Object.assign(tip.style, {
       position: 'fixed', pointerEvents: 'none', display: 'none',
-      background: 'rgba(10,14,26,0.93)', color: '#e8eaf0',
+      background: 'rgba(254,252,249,0.96)', color: '#1E1B4B',
       padding: '8px 12px', borderRadius: '6px', fontSize: '13px',
       maxWidth: '240px', lineHeight: '1.6', zIndex: '9999',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
-      border: '1px solid rgba(255,255,255,0.08)',
+      boxShadow: '0 4px 14px rgba(99,102,241,0.12)',
+      border: '1px solid rgba(99,102,241,0.12)',
     });
     tooltipRef.current = tip;
 
@@ -169,7 +169,7 @@ export default function NationalMap() {
     valid.forEach(uni => {
       const marker = L.circleMarker([uni.lat, uni.lon], {
         radius: 8,
-        fillColor: '#22d3ee',
+        fillColor: '#6366F1',
         fillOpacity: 0.9,
         color: '#fff',
         weight: 2,
