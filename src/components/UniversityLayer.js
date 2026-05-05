@@ -5,6 +5,7 @@ import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { useApp } from '../context/AppContext';
+import { passesFilters } from './FilterPanel';
 import { METRICS } from './NationalMap';
 
 // Map national-level metric keys → university-level field names
@@ -26,7 +27,7 @@ export default function UniversityLayer({ map, universities }) {
 
   const { metric, selectedUniversity, setSelectedUniversity,
           comparedUniversities, toggleCompareUniversity,
-          highlightedUnis } = useApp();
+          highlightedUnis, filters } = useApp();
 
   // Keep stable refs for use inside Leaflet callbacks
   const metricRef      = useRef(metric);
@@ -253,6 +254,28 @@ export default function UniversityLayer({ map, universities }) {
       if ((isSelected || isCompared) && marker.bringToFront) marker.bringToFront();
     });
   }, [selectedUniversity, comparedUniversities, universities]);
+
+  // ── Dim markers that don't pass sidebar filters ─────────────────────────
+  useEffect(() => {
+    const cg = clusterGroupRef.current;
+    if (!cg) return;
+    const hasFilters = Object.keys(filters).length > 0;
+    const comparedIds = new Set(comparedUniversities.map(u => u.unitid));
+
+    cg.eachLayer(marker => {
+      if (!marker._uni || !marker.setStyle) return;
+      const isCompared = comparedIds.has(marker._uni.unitid);
+      if (!hasFilters || isCompared) {
+        marker.setStyle({ fillOpacity: isCompared ? 1 : 0.8, opacity: 1 });
+        return;
+      }
+      const passes = passesFilters(marker._uni, filters);
+      marker.setStyle({
+        fillOpacity: passes ? 0.8 : 0.12,
+        opacity: passes ? 1 : 0.25,
+      });
+    });
+  }, [filters, comparedUniversities]);
 
   // ── Highlight/dim markers based on chart brushing ───────────────────────
   useEffect(() => {

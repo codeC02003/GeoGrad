@@ -10,6 +10,8 @@ import UniversityDetailPanel from '../components/UniversityDetailPanel';
 import SearchBar from '../components/SearchBar';
 import ScatterPlot from '../components/ScatterPlot';
 import ParallelCoordinates from '../components/ParallelCoordinates';
+import FilterPanel from '../components/FilterPanel';
+import { activeFilterCount } from '../components/FilterPanel';
 import stateData from '../data/state_data.json';
 import universityData from '../data/university_data.json';
 
@@ -17,7 +19,10 @@ import universityData from '../data/university_data.json';
 function Sidebar() {
   const { metric, setMetric, selectedStates, toggleState,
           zoomedState, comparedUniversities, toggleCompareUniversity,
-          clearComparedUniversities, chartView } = useApp();
+          clearComparedUniversities, chartView, filters,
+          distanceMode, setDistanceMode, referencePoint, setReferencePoint,
+          showChoropleth, setShowChoropleth, showUniversities, setShowUniversities } = useApp();
+  const [showFilters, setShowFilters] = useState(false);
   const navigate = useNavigate();
 
   const uniCount = useMemo(
@@ -72,6 +77,83 @@ function Sidebar() {
             </select>
           </div>
         )}
+
+        {!chartView && !zoomedState && (
+          <div className="sidebar-section">
+            <div className="sidebar-label">Map Layers</div>
+            <label className="layer-checkbox">
+              <input
+                type="checkbox"
+                checked={showChoropleth}
+                onChange={e => {
+                  if (!e.target.checked && !showUniversities) return;
+                  setShowChoropleth(e.target.checked);
+                }}
+              />
+              <span>Choropleth (State Metrics)</span>
+            </label>
+            <label className="layer-checkbox">
+              <input
+                type="checkbox"
+                checked={showUniversities}
+                onChange={e => {
+                  if (!e.target.checked && !showChoropleth) return;
+                  setShowUniversities(e.target.checked);
+                }}
+              />
+              <span>Universities (All 2,095)</span>
+            </label>
+          </div>
+        )}
+
+        {!chartView && (
+          <div className="sidebar-section">
+            <div className="sidebar-label">Distance Tool</div>
+            <button
+              className={`distance-toggle${distanceMode ? ' distance-toggle--active' : ''}`}
+              onClick={() => {
+                const next = !distanceMode;
+                setDistanceMode(next);
+                if (!next) setReferencePoint(null);
+              }}
+            >
+              <svg viewBox="0 0 18 18" width="14" height="14" fill="none">
+                <path d="M3 15l12-12M3 15l2-5M3 15l5-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="15" cy="3" r="2" stroke="currentColor" strokeWidth="1.3"/>
+                <circle cx="3" cy="15" r="2" stroke="currentColor" strokeWidth="1.3"/>
+              </svg>
+              {distanceMode ? 'Measuring — click map' : 'Measure Distance'}
+            </button>
+            {distanceMode && !referencePoint && (
+              <div className="distance-hint">Click anywhere on the map to place a pin. Straight-line distances to compared universities will appear.</div>
+            )}
+            {referencePoint && (
+              <div className="distance-ref-info">
+                <span>Pin: {referencePoint.lat.toFixed(2)}°, {referencePoint.lng.toFixed(2)}°</span>
+                <button className="distance-clear" onClick={() => setReferencePoint(null)}>Clear pin</button>
+              </div>
+            )}
+            {referencePoint && comparedUniversities.length === 0 && (
+              <div className="distance-hint">Add universities to compare to see distances.</div>
+            )}
+          </div>
+        )}
+
+        <div className="sidebar-section">
+          <button
+            className={`filter-toggle${showFilters ? ' filter-toggle--active' : ''}`}
+            onClick={() => setShowFilters(v => !v)}
+          >
+            <svg viewBox="0 0 18 18" width="14" height="14" fill="none">
+              <path d="M2 4h14M5 9h8M7 14h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            {showFilters ? 'Hide Filters' : 'Filter Universities'}
+            {activeFilterCount(filters) > 0 && (
+              <span className="sidebar-badge">{activeFilterCount(filters)}</span>
+            )}
+          </button>
+          {showFilters && <FilterPanel />}
+        </div>
 
         {!zoomedState && selectedStates.length > 0 && (
           <div className="sidebar-section">

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 import { useApp } from '../context/AppContext';
+import { passesFilters } from './FilterPanel';
 import universityData from '../data/university_data.json';
 
 const AXIS_OPTIONS = [
@@ -10,7 +11,6 @@ const AXIS_OPTIONS = [
   { key: 'graduation_rate',   label: 'Graduation Rate' },
   { key: 'retention_rate',    label: 'Retention Rate' },
   { key: 'enrollment_total',  label: 'Enrollment', log: true },
-  { key: 'sat_avg',           label: 'SAT Average' },
   { key: 'student_faculty_ratio', label: 'Student:Faculty Ratio' },
   { key: 'avg_inst_grant',    label: 'Avg Institutional Grant' },
 ];
@@ -24,8 +24,12 @@ function buildScale(key, data, range) {
   return d3.scaleLinear().domain([mn, mx]).range(range).nice();
 }
 
-function isValid(v) {
-  return v != null && v !== 0 && Number.isFinite(v);
+const ZERO_IS_MISSING = new Set(['admission_rate', 'graduation_rate', 'retention_rate']);
+
+function isValid(v, key) {
+  if (v == null || !Number.isFinite(v)) return false;
+  if (v === 0 && ZERO_IS_MISSING.has(key)) return false;
+  return true;
 }
 
 export default function ScatterPlot() {
@@ -33,7 +37,7 @@ export default function ScatterPlot() {
   const [xKey, setXKey] = useState('tuition_out');
   const [yKey, setYKey] = useState('graduation_rate');
   const [resizeKey, setResizeKey] = useState(0);
-  const { comparedUniversities, toggleCompareUniversity } = useApp();
+  const { comparedUniversities, toggleCompareUniversity, filters } = useApp();
 
   const fnRef = useRef();
   fnRef.current = { toggleCompareUniversity };
@@ -70,7 +74,7 @@ export default function ScatterPlot() {
       const g = svg.append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
 
-      const data = universityData.filter(u => isValid(u[xKey]) && isValid(u[yKey]));
+      const data = universityData.filter(u => isValid(u[xKey], xKey) && isValid(u[yKey], yKey));
 
       if (data.length === 0) {
         g.append('text').attr('x', W / 2).attr('y', H / 2)
@@ -125,19 +129,32 @@ export default function ScatterPlot() {
 
       // ── Dots ─────────────────────────────────────────────
       const comparedIds = new Set(comparedUniversities.map(u => u.unitid));
+      const hasFilters = Object.keys(filters).length > 0;
 
       const dots = g.append('g').selectAll('circle').data(data).join('circle')
         .attr('cx', d => xScale(d[xKey]))
         .attr('cy', d => yScale(d[yKey]))
         .attr('r', d => comparedIds.has(d.unitid) ? 5 : 3)
-        .attr('fill', d => comparedIds.has(d.unitid) ? '#6366F1' : '#8B5CF6')
-        .attr('fill-opacity', d => comparedIds.has(d.unitid) ? 0.95 : 0.4)
+        .attr('fill', d => {
+          if (comparedIds.has(d.unitid)) return '#6366F1';
+          if (hasFilters && !passesFilters(d, filters)) return '#3B3660';
+          return '#8B5CF6';
+        })
+        .attr('fill-opacity', d => {
+          if (comparedIds.has(d.unitid)) return 0.95;
+          if (hasFilters && !passesFilters(d, filters)) return 0.15;
+          return 0.5;
+        })
         .attr('stroke', d => comparedIds.has(d.unitid) ? '#1E1B4B' : 'none')
         .attr('stroke-width', d => comparedIds.has(d.unitid) ? 1.5 : 0)
         .style('pointer-events', 'none');
 
       function resetDots() {
-        dots.attr('fill-opacity', d => comparedIds.has(d.unitid) ? 0.95 : 0.4)
+        dots.attr('fill-opacity', d => {
+            if (comparedIds.has(d.unitid)) return 0.95;
+            if (hasFilters && !passesFilters(d, filters)) return 0.15;
+            return 0.5;
+          })
           .attr('r', d => comparedIds.has(d.unitid) ? 5 : 3)
           .attr('stroke', d => comparedIds.has(d.unitid) ? '#1E1B4B' : 'none')
           .attr('stroke-width', d => comparedIds.has(d.unitid) ? 1.5 : 0);
@@ -191,7 +208,7 @@ export default function ScatterPlot() {
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [xKey, yKey, comparedUniversities, resizeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [xKey, yKey, comparedUniversities, filters, resizeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="chart-container">

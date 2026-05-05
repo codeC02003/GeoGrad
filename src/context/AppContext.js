@@ -10,6 +10,11 @@ export function AppProvider({ children }) {
   const [comparedUniversities, setComparedUniversities] = useState([]);
   const [highlightedUnis, setHighlightedUnis] = useState(null);
   const [chartView, setChartView] = useState(null);
+  const [distanceMode, setDistanceMode] = useState(false);
+  const [referencePoint, setReferencePoint] = useState(null);
+  const [filters, setFilters] = useState({});
+  const [showChoropleth, setShowChoropleth] = useState(true);
+  const [showUniversities, setShowUniversities] = useState(false);
 
   const pendingUniRef = useRef(null);
   const zoomedStateRef = useRef(zoomedState);
@@ -86,6 +91,11 @@ export function AppProvider({ children }) {
       comparedUniversities, toggleCompareUniversity, clearComparedUniversities,
       highlightedUnis, setHighlightedUnis,
       chartView, setChartView,
+      distanceMode, setDistanceMode,
+      referencePoint, setReferencePoint,
+      filters, setFilters,
+      showChoropleth, setShowChoropleth,
+      showUniversities, setShowUniversities,
     }}>
       {children}
     </AppContext.Provider>

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useApp } from '../context/AppContext';
+import { haversineDistance, formatDistance } from '../utils/distance';
 import geoJson from '../data/us-states.json';
 import universityData from '../data/university_data.json';
 import UniversityLayer from './UniversityLayer';
@@ -11,7 +12,11 @@ export default function StateMap({ zoomingOut, onZoomOutComplete }) {
   const mapRef       = useRef(null);
   const [mapReady, setMapReady] = useState(false);
 
-  const { zoomedState, selectedUniversity, backToNational } = useApp();
+  const { zoomedState, selectedUniversity, backToNational,
+          distanceMode, referencePoint, setReferencePoint,
+          comparedUniversities } = useApp();
+  const distLineRef  = useRef([]);
+  const refMarkerRef = useRef(null);
 
   // Find the GeoJSON feature for this state
   const stateFeature = useMemo(
@@ -113,6 +118,62 @@ export default function StateMap({ zoomingOut, onZoomOutComplete }) {
       if (onZoomOutComplete) onZoomOutComplete();
     });
   }, [zoomingOut, onZoomOutComplete]);
+
+  // ── Distance mode: click handler ────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    const handler = (e) => {
+      if (distanceMode) setReferencePoint({ lat: e.latlng.lat, lng: e.latlng.lng });
+    };
+    map.on('click', handler);
+    return () => map.off('click', handler);
+  }, [mapReady, distanceMode, setReferencePoint]);
+
+  // ── Distance mode: cursor style ──────────────────────────────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.style.cursor = distanceMode ? 'crosshair' : '';
+  }, [distanceMode]);
+
+  // ── Distance mode: reference marker + lines ─────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (refMarkerRef.current) { map.removeLayer(refMarkerRef.current); refMarkerRef.current = null; }
+    distLineRef.current.forEach(l => map.removeLayer(l));
+    distLineRef.current = [];
+
+    if (!referencePoint) return;
+
+    const pin = L.circleMarker([referencePoint.lat, referencePoint.lng], {
+      radius: 8, fillColor: '#EF4444', fillOpacity: 0.9,
+      color: '#fff', weight: 2.5, pane: 'markerPane',
+    });
+    pin.bindTooltip('Reference Point', { permanent: true, direction: 'top', offset: [0, -10], className: 'distance-label' });
+    pin.addTo(map);
+    refMarkerRef.current = pin;
+
+    const valid = comparedUniversities.filter(u => u.lat != null && u.lon != null);
+    valid.forEach(uni => {
+      const dist = haversineDistance(referencePoint.lat, referencePoint.lng, uni.lat, uni.lon);
+      const line = L.polyline(
+        [[referencePoint.lat, referencePoint.lng], [uni.lat, uni.lon]],
+        { color: '#EF4444', weight: 2, dashArray: '8 6', opacity: 0.7 },
+      );
+      line.addTo(map);
+      distLineRef.current.push(line);
+
+      const mid = [(referencePoint.lat + uni.lat) / 2, (referencePoint.lng + uni.lon) / 2];
+      const label = L.tooltip({ permanent: true, direction: 'center', className: 'distance-label' })
+        .setLatLng(mid)
+        .setContent(formatDistance(dist));
+      map.addLayer(label);
+      distLineRef.current.push(label);
+    });
+  }, [referencePoint, comparedUniversities]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>

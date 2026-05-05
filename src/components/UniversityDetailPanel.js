@@ -3,8 +3,8 @@ import * as d3 from 'd3';
 import { useApp } from '../context/AppContext';
 
 const fmt    = v => v != null ? d3.format(',')(Math.round(v)) : '—';
-const pct    = v => v != null ? `${(v * 100).toFixed(1)}%` : '—';
-const pctRaw = v => v != null ? `${v.toFixed(1)}%` : '—';
+const pct    = v => (v != null && v !== 0) ? `${(v * 100).toFixed(1)}%` : '—';
+const pctRaw = v => (v != null && v !== 0) ? `${v.toFixed(1)}%` : '—';
 const dollar = v => v != null ? `$${d3.format(',')(Math.round(v))}` : '—';
 const rank   = v => v != null ? `#${Math.round(v)}` : '—';
 
@@ -41,7 +41,6 @@ export default function UniversityDetailPanel() {
         <div className="uni-detail-section">
           <div className="uni-section-title">Academics</div>
           <div className="uni-stat-row"><span>Admission Rate</span><span>{pct(uni.admission_rate)}</span></div>
-          <div className="uni-stat-row"><span>SAT Average</span><span>{fmt(uni.sat_avg)}</span></div>
           <div className="uni-stat-row"><span>Graduation Rate</span><span>{pctRaw(uni.graduation_rate)}</span></div>
           <div className="uni-stat-row"><span>Retention Rate</span><span>{pctRaw(uni.retention_rate)}</span></div>
           <div className="uni-stat-row"><span>CS Degree %</span><span>{uni.pct_cs_degrees != null ? `${(uni.pct_cs_degrees * 100).toFixed(1)}%` : '—'}</span></div>

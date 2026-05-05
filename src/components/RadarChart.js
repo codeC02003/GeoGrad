@@ -7,7 +7,6 @@ const RADAR_METRICS = [
   { key: 'graduation_rate',   label: 'Grad Rate',    invert: false },
   { key: 'retention_rate',    label: 'Retention',     invert: false },
   { key: 'tuition_out',       label: 'Tuition',      invert: true },
-  { key: 'sat_avg',           label: 'SAT',          invert: false },
   { key: 'avg_inst_grant',    label: 'Grant Aid',    invert: false },
   { key: 'enrollment_total',  label: 'Enrollment',   invert: false },
   { key: 'student_faculty_ratio', label: 'Stu:Fac',  invert: true },

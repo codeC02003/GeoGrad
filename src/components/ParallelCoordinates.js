@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 import { useApp } from '../context/AppContext';
+import { passesFilters } from './FilterPanel';
 import universityData from '../data/university_data.json';
 
 const DEFAULT_AXES = [
@@ -8,7 +9,6 @@ const DEFAULT_AXES = [
   { key: 'admission_rate',    label: 'Admission Rate' },
   { key: 'graduation_rate',   label: 'Grad Rate' },
   { key: 'retention_rate',    label: 'Retention' },
-  { key: 'sat_avg',           label: 'SAT Avg' },
   { key: 'enrollment_total',  label: 'Enrollment' },
   { key: 'avg_inst_grant',    label: 'Avg Grant' },
   { key: 'student_faculty_ratio', label: 'Stu:Fac' },
@@ -18,7 +18,8 @@ export default function ParallelCoordinates() {
   const svgRef = useRef(null);
   const [resizeKey, setResizeKey] = useState(0);
   const axisOrderRef = useRef(DEFAULT_AXES.map(a => a.key));
-  const { comparedUniversities, toggleCompareUniversity } = useApp();
+  const brushesRef = useRef({});
+  const { comparedUniversities, toggleCompareUniversity, filters } = useApp();
 
   const fnRef = useRef();
   fnRef.current = { toggleCompareUniversity };
@@ -64,6 +65,8 @@ export default function ParallelCoordinates() {
       });
 
       const comparedIds = new Set(comparedUniversities.map(u => u.unitid));
+      const hasFilters = Object.keys(filters).length > 0;
+      const activeBrushes = brushesRef.current;
 
       const yScales = {};
       axes.forEach(a => {
@@ -81,9 +84,26 @@ export default function ParallelCoordinates() {
         .domain(axes.map(a => a.key))
         .range([0, width]).padding(0.1);
 
-      // Mutable positions for smooth drag across reorders
       const positions = {};
       axes.forEach(a => { positions[a.key] = xScale(a.key); });
+
+      function passesBrushes(d) {
+        for (const key of Object.keys(activeBrushes)) {
+          const [y0, y1] = activeBrushes[key];
+          const v = d[key];
+          if (v == null) return false;
+          const scaledV = yScales[key](v);
+          if (scaledV < y0 || scaledV > y1) return false;
+        }
+        return true;
+      }
+
+      function isHighlighted(d) {
+        const hasBrush = Object.keys(activeBrushes).length > 0;
+        const brushOk = !hasBrush || passesBrushes(d);
+        const filterOk = !hasFilters || passesFilters(d, filters);
+        return brushOk && filterOk;
+      }
 
       function makeLinePath(d, overrideKey, overrideX) {
         const pts = axes.map(a => {
@@ -98,18 +118,33 @@ export default function ParallelCoordinates() {
         return makeLinePath(d, null, null);
       }
 
-      // Lines layer
+      function updateLineStyles() {
+        lines
+          .attr('stroke', d => comparedIds.has(d.unitid) ? '#6366F1' : isHighlighted(d) ? '#8B5CF6' : '#3B3660')
+          .attr('stroke-width', d => comparedIds.has(d.unitid) ? 2.5 : isHighlighted(d) ? 0.8 : 0.4)
+          .attr('stroke-opacity', d => {
+            if (comparedIds.has(d.unitid)) return 0.9;
+            return isHighlighted(d) ? 0.25 : 0.03;
+          })
+          .style('pointer-events', d => isHighlighted(d) || comparedIds.has(d.unitid) ? 'stroke' : 'none')
+          .attr('cursor', d => isHighlighted(d) || comparedIds.has(d.unitid) ? 'pointer' : 'default');
+      }
+
       const linesLayer = g.append('g').attr('class', 'lines-layer');
       const lines = linesLayer.selectAll('.pc-line').data(data).join('path')
         .attr('class', 'pc-line')
         .attr('d', linePath)
         .attr('fill', 'none')
-        .attr('stroke', d => comparedIds.has(d.unitid) ? '#6366F1' : '#8B5CF6')
-        .attr('stroke-width', d => comparedIds.has(d.unitid) ? 2.5 : 0.5)
-        .attr('stroke-opacity', d => comparedIds.has(d.unitid) ? 0.9 : 0.12)
-        .style('pointer-events', 'stroke')
-        .attr('cursor', 'pointer')
+        .attr('stroke', d => comparedIds.has(d.unitid) ? '#6366F1' : isHighlighted(d) ? '#8B5CF6' : '#3B3660')
+        .attr('stroke-width', d => comparedIds.has(d.unitid) ? 2.5 : isHighlighted(d) ? 0.8 : 0.4)
+        .attr('stroke-opacity', d => {
+          if (comparedIds.has(d.unitid)) return 0.9;
+          return isHighlighted(d) ? 0.25 : 0.03;
+        })
+        .style('pointer-events', d => isHighlighted(d) || comparedIds.has(d.unitid) ? 'stroke' : 'none')
+        .attr('cursor', d => isHighlighted(d) || comparedIds.has(d.unitid) ? 'pointer' : 'default')
         .on('mouseenter', function(event, d) {
+          if (!isHighlighted(d) && !comparedIds.has(d.unitid)) return;
           d3.select(this).attr('stroke-opacity', 0.9).attr('stroke-width', 2.5).raise();
           tooltip.style('display', 'block')
             .style('left', `${event.offsetX + 12}px`)
@@ -119,11 +154,12 @@ export default function ParallelCoordinates() {
         .on('mouseleave', function(_, d) {
           const isComp = comparedIds.has(d.unitid);
           d3.select(this)
-            .attr('stroke-opacity', isComp ? 0.9 : 0.12)
-            .attr('stroke-width', isComp ? 2.5 : 0.5);
+            .attr('stroke-opacity', isComp ? 0.9 : isHighlighted(d) ? 0.25 : 0.03)
+            .attr('stroke-width', isComp ? 2.5 : isHighlighted(d) ? 0.8 : 0.4);
           tooltip.style('display', 'none');
         })
         .on('click', function(event, d) {
+          if (!isHighlighted(d) && !comparedIds.has(d.unitid)) return;
           event.stopPropagation();
           const uni = universityData.find(u => u.unitid === d.unitid);
           if (uni) fnRef.current.toggleCompareUniversity(uni, false);
@@ -131,7 +167,6 @@ export default function ParallelCoordinates() {
 
       const tooltip = d3.select(container).select('.pc-tooltip');
 
-      // Axes layer
       const axesLayer = g.append('g').attr('class', 'axes-layer');
       const axisGroups = {};
 
@@ -147,6 +182,46 @@ export default function ParallelCoordinates() {
           .call(d3.axisLeft(yScales[a.key]).ticks(5).tickFormat(d3.format('.2s')));
         axis.selectAll('text').attr('fill', '#7C73A6').attr('font-size', '9px');
         axis.selectAll('line, path').attr('stroke', 'rgba(99,102,241,0.15)');
+
+        // Brush on each axis
+        const brushWidth = 24;
+        const brush = d3.brushY()
+          .extent([[-brushWidth / 2, 0], [brushWidth / 2, height]])
+          .on('brush', function(event) {
+            if (!event.sourceEvent) return;
+            if (event.selection) {
+              activeBrushes[a.key] = event.selection;
+            } else {
+              delete activeBrushes[a.key];
+            }
+            updateLineStyles();
+          })
+          .on('end', function(event) {
+            if (!event.sourceEvent) return;
+            if (event.selection) {
+              activeBrushes[a.key] = event.selection;
+            } else {
+              delete activeBrushes[a.key];
+            }
+            brushesRef.current = { ...activeBrushes };
+            updateLineStyles();
+          });
+
+        const brushG = axisG.append('g')
+          .attr('class', 'pc-brush')
+          .call(brush);
+
+        if (activeBrushes[a.key]) {
+          brushG.call(brush.move, activeBrushes[a.key]);
+        }
+
+        brushG.selectAll('.selection')
+          .attr('fill', 'rgba(99,102,241,0.25)')
+          .attr('stroke', '#6366F1')
+          .attr('stroke-width', 1);
+        brushG.selectAll('.handle')
+          .attr('fill', '#6366F1')
+          .attr('rx', 2);
 
         const label = axisG.append('text')
           .attr('y', -16).attr('text-anchor', 'middle')
@@ -182,7 +257,6 @@ export default function ParallelCoordinates() {
             xScale.domain(newOrder);
             axes.forEach(ax => { positions[ax.key] = xScale(ax.key); });
 
-            // Animate axes and lines to final positions
             axes.forEach(ax => {
               axisGroups[ax.key]
                 .transition().duration(300).ease(d3.easeCubicOut)
@@ -197,12 +271,12 @@ export default function ParallelCoordinates() {
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [comparedUniversities, resizeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [comparedUniversities, filters, resizeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="chart-container">
       <div className="chart-controls">
-        <span className="chart-hint">Drag axis label to reorder &middot; Click line to compare</span>
+        <span className="chart-hint">Drag axis label to reorder &middot; Drag on axis to brush/filter &middot; Click line to compare</span>
       </div>
       <div className="chart-svg-wrapper">
         <svg ref={svgRef} />
